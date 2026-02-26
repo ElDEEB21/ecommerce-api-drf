@@ -1,4 +1,5 @@
-﻿﻿asgiref==3.11.1
+﻿drf-spectacular
+﻿asgiref==3.11.1
 certifi==2026.1.4
 charset-normalizer==3.4.4
 Django==6.0.2
