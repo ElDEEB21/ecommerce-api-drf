@@ -85,6 +85,17 @@ class ProductService:
         product.delete()
         return product
 
+    def add_image_to_product(product: Product, image_url: str) -> Product:
+        """
+        Add an image to a product
+        Args:
+            product: Product instance
+            image_url: URL of the image to add
+        Returns:
+            Updated Product instance with the new image
+        """
+        product.images.create(image_url=image_url)
+        return product
 
 class InventoryService:
 

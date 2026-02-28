@@ -31,7 +31,13 @@ class CategoryDetailSerializer(serializers.ModelSerializer):
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
-        fields = ['id', 'image_url', 'is_primary']
+        fields = ['id', 'product', 'image_url', 'is_primary']
+        extra_kwargs = {
+            'id': {'read_only': True},
+            'product': {'required': True},
+            'image_url': {'required': True},
+            'is_primary': {'required': False, 'default': False}
+        }
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -64,13 +70,3 @@ class ProductSerializer(serializers.ModelSerializer):
         }
 
 
-class ProductImageSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProductImage
-        fields = ['id', 'product', 'image_url', 'is_primary']
-        extra_kwargs = {
-            'id': {'read_only': True},
-            'product': {'required': True},
-            'image_url': {'required': True},
-            'is_primary': {'required': False, 'default': False}
-        }

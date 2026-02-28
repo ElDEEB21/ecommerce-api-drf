@@ -90,3 +90,17 @@ def get_products_by_category(category: Category):
         QuerySet of Product instances related to the category
     """
     return Product.objects.filter(category=category)
+
+
+def get_image_by_id(image_id: int) -> ProductImage:
+    """
+    Get product image by ID
+    Args:
+        image_id: ProductImage ID
+    Returns:
+        ProductImage instance or None if not found
+    """
+    try:
+        return ProductImage.objects.get(id=image_id)
+    except ProductImage.DoesNotExist:
+        return None
