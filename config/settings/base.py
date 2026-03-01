@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     'drf_spectacular',
 
@@ -149,16 +150,25 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
 }
 
-
-# JWT Settings
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'UPDATE_LAST_LOGIN': True,
+}
+
+# JWT Cookie Settings
+JWT_COOKIE_SETTINGS = {
+    'ACCESS_TOKEN_COOKIE_NAME': 'access_token',
+    'REFRESH_TOKEN_COOKIE_NAME': 'refresh_token',
+    'COOKIE_SECURE': False,
+    'COOKIE_HTTPONLY': True,
+    'COOKIE_SAMESITE': 'Lax',
+    'COOKIE_MAX_AGE': 60 * 60 * 24 * 7,
 }
 
 AUTH_USER_MODEL = 'accounts.CustomUser'

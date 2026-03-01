@@ -1,7 +1,81 @@
+from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from . import selectors
 from .models import CustomUser
+
+
+class CookieService:
+    """Service for handling JWT cookie operations"""
+
+    @staticmethod
+    def get_cookie_settings():
+        """Returns JWT cookie settings from Django settings."""
+        return getattr(settings, 'JWT_COOKIE_SETTINGS', {})
+
+    @staticmethod
+    def set_auth_cookies(response, tokens):
+        """Sets access and refresh token cookies on the response."""
+        cookie_settings = CookieService.get_cookie_settings()
+        access_cookie_name = cookie_settings.get('ACCESS_TOKEN_COOKIE_NAME', 'access_token')
+        refresh_cookie_name = cookie_settings.get('REFRESH_TOKEN_COOKIE_NAME', 'refresh_token')
+        cookie_secure = cookie_settings.get('COOKIE_SECURE', False)
+        cookie_httponly = cookie_settings.get('COOKIE_HTTPONLY', True)
+        cookie_samesite = cookie_settings.get('COOKIE_SAMESITE', 'Lax')
+        cookie_max_age = cookie_settings.get('COOKIE_MAX_AGE', 60 * 60 * 24 * 7)
+
+        response.set_cookie(
+            key=access_cookie_name,
+            value=tokens['access'],
+            max_age=300,
+            secure=cookie_secure,
+            httponly=cookie_httponly,
+            samesite=cookie_samesite,
+        )
+
+        if 'refresh' in tokens:
+            response.set_cookie(
+                key=refresh_cookie_name,
+                value=tokens['refresh'],
+                max_age=cookie_max_age,
+                secure=cookie_secure,
+                httponly=cookie_httponly,
+                samesite=cookie_samesite,
+            )
+
+        return response
+
+    @staticmethod
+    def delete_auth_cookies(response):
+        """Deletes access and refresh token cookies from the response."""
+        cookie_settings = CookieService.get_cookie_settings()
+        refresh_cookie_name = cookie_settings.get('REFRESH_TOKEN_COOKIE_NAME', 'refresh_token')
+        access_cookie_name = cookie_settings.get('ACCESS_TOKEN_COOKIE_NAME', 'access_token')
+        cookie_samesite = cookie_settings.get('COOKIE_SAMESITE', 'Lax')
+        response.delete_cookie(
+            key=refresh_cookie_name,
+            samesite=cookie_samesite
+        )
+        response.delete_cookie(
+            key=access_cookie_name,
+            samesite=cookie_samesite
+        )
+
+        return response
+
+    @staticmethod
+    def get_refresh_token_from_request(request):
+        """
+        Extracts refresh token from request.
+        Tries cookies first (more secure), then falls back to request body.
+        Returns tuple: (refresh_token, cookie_name)
+        """
+        cookie_settings = CookieService.get_cookie_settings()
+        refresh_cookie_name = cookie_settings.get('REFRESH_TOKEN_COOKIE_NAME', 'refresh_token')
+        refresh_token = request.COOKIES.get(refresh_cookie_name)
+        if not refresh_token:
+            refresh_token = request.data.get('refresh')
+        return refresh_token, refresh_cookie_name
 
 
 class AuthService:
@@ -35,6 +109,21 @@ class AuthService:
             last_name=user_data.get('last_name', '')
         )
         return user
+
+    @staticmethod
+    def logout(refresh_token: str):
+        """
+        Logout a user by blacklisting the refresh token
+        Args:
+            refresh_token: The refresh token string to blacklist
+        Raises:
+            ValueError if refresh token is invalid
+        """
+        try:
+            token = RefreshToken(refresh_token)  # type: ignore
+            token.blacklist()
+        except Exception as e:
+            raise ValueError(f"Invalid token: {str(e)}")
 
     @staticmethod
     def authenticate(email: str, password: str):
@@ -76,13 +165,17 @@ class AuthService:
         Args:
             refresh_token: The refresh token string
         Returns:
-            New access token string
+            Dictionary with new access token and optionally new refresh token
         Raises:
-            Exception if refresh token is invalid
+            Exception if refresh token is invalid or blacklisted
         """
         try:
             refresh = RefreshToken(refresh_token)  # type: ignore
-            return str(refresh.access_token)
+            refresh.verify()
+            return {
+                'access': str(refresh.access_token),
+                'refresh': str(refresh)
+            }
         except Exception as e:
             raise ValueError(f"Invalid refresh token: {str(e)}")
 
