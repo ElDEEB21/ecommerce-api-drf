@@ -25,3 +25,8 @@ class CartItem(models.Model):
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name} in {self.cart}"
+
+    def save(self, *args, **kwargs):
+        if not self.price_snapshot:
+            self.price_snapshot = self.product.price
+        super().save(*args, **kwargs)
