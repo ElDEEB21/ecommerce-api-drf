@@ -13,6 +13,8 @@ A **production-ready**, fully-featured E-Commerce RESTful API built with **Djang
 demonstrates clean architecture, secure authentication, real payment processing with Stripe, and follows industry best
 practices for building scalable backend services.
 
+> 💡 **Project idea & description from [roadmap.sh — E-Commerce API](https://roadmap.sh/projects/ecommerce-api)**
+
 > **🔗 [Full API Documentation →](./API_DOCUMENTATION.md)**
 
 ---
