@@ -22,7 +22,7 @@ practices for building scalable backend services.
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
-- [Key Features (المميزات)](#-key-features-المميزات)
+- [Key Features](#-key-features-المميزات)
 - [Architecture & Design Patterns](#-architecture--design-patterns)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
