@@ -1,9 +1,5 @@
 # 🛒 E-Commerce API Documentation
 
-> **Version:** 1.0.0
-> **Base URL:** `https://your-domain.com/`
-> **Last Updated:** March 5, 2026
-
 ---
 
 ## Table of Contents
