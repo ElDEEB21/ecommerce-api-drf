@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -18,8 +19,9 @@ class CheckoutView(APIView):
         shipping_address = request.data.get('shipping_address', '')
 
         try:
-            order = OrderService.create_order_from_cart(user.id, shipping_address)
-            order = CheckoutService.process_checkout(order.id)
+            with transaction.atomic():
+                order = OrderService.create_order_from_cart(user.id, shipping_address)
+                order = CheckoutService.process_checkout(order.id)
             serializer = OrderSerializer(order)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except ValidationError as e:

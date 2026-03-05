@@ -7,10 +7,12 @@ import stripe
 from django.conf import settings
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db import transaction
+from django.db.models import F
 
 from .models import Payment
 from ..orders.models import Order
 from ..orders.services import OrderService
+from ..products.models import Product
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,20 @@ class PaymentService:
         return f"order_{order_id}_{uuid.uuid4().hex}"
 
     @staticmethod
+    def _cancel_order_and_restore_stock(order_id: int, reason: str = '') -> None:
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.status not in [Order.Status.PENDING, Order.Status.PROCESSING]:
+            return
+        order.status = Order.Status.CANCELLED
+        order.save(update_fields=['status', 'updated_at'])
+        for item in order.items.select_related('product').all():
+            Product.objects.filter(id=item.product_id).update(
+                stock_quantity=F('stock_quantity') + item.quantity
+            )
+
+        logger.info(f"Order {order.id} cancelled and stock restored{f' ({reason})' if reason else ''}")
+
+    @staticmethod
     @transaction.atomic
     def create_payment_intent(order_id: int, user, currency: str = None, idempotency_key: str = None) -> Dict[str, Any]:
         currency = currency or getattr(settings, 'STRIPE_CURRENCY', 'usd')
@@ -51,9 +67,9 @@ class PaymentService:
             )
             raise PermissionDenied("You don't have permission to pay for this order.")
 
-        if order.status != Order.Status.PENDING:
+        if order.status not in [Order.Status.PENDING, Order.Status.PROCESSING]:
             raise ValidationError(
-                f"Order is not in pending status. Current status: {order.status}"
+                f"Order is not in a payable status. Current status: {order.status}"
             )
 
         existing_payment = Payment.objects.filter(order=order).first()
@@ -191,6 +207,10 @@ class PaymentService:
             payment.save(update_fields=['status', 'updated_at'])
 
             logger.info(f"Cancelled payment {payment_id} for order {payment.order_id}")
+            PaymentService._cancel_order_and_restore_stock(
+                payment.order_id, reason='payment cancelled'
+            )
+
             return payment
         except stripe.error.StripeError as e:
             logger.error(f"Error cancelling payment {payment_id}: {e}")
@@ -236,11 +256,9 @@ class PaymentService:
             refund = stripe.Refund.create(**refund_params)
             payment.status = Payment.Status.REFUNDED
             payment.save(update_fields=['status', 'updated_at'])
-
-            try:
-                OrderService.cancel_order(payment.order)
-            except ValidationError:
-                pass
+            PaymentService._cancel_order_and_restore_stock(
+                payment.order_id, reason='payment refunded'
+            )
 
             logger.info(
                 f"Refunded payment {payment_id}: "
@@ -317,14 +335,34 @@ class StripeWebhookService:
                 'status': 'skipped',
                 'message': f"Payment not found for intent {payment_intent_id}"
             }
+
+        if payment.is_successful:
+            logger.info(f"Payment {payment.id} already marked as succeeded, skipping")
+            return {
+                'status': 'skipped',
+                'message': f"Payment {payment.id} already succeeded"
+            }
+
         payment.status = Payment.Status.SUCCEEDED
         payment.save(update_fields=['status', 'updated_at'])
 
-        try:
-            OrderService.update_order_status(payment.order, Order.Status.PROCESSING)
-            logger.info(f"Order {payment.order_id} status updated to PROCESSING")
-        except ValidationError as e:
-            logger.warning(f"Could not update order status: {e}")
+        order = Order.objects.select_for_update().get(id=payment.order_id)
+        if order.status == Order.Status.PENDING:
+            try:
+                OrderService.update_order_status(order, Order.Status.PROCESSING)
+                logger.info(f"Order {order.id} status updated to PROCESSING")
+            except ValidationError as e:
+                logger.warning(f"Could not update order status: {e}")
+        elif order.status == Order.Status.PROCESSING:
+            logger.info(
+                f"Order {order.id} already in PROCESSING status, "
+                f"no transition needed after payment success"
+            )
+        else:
+            logger.warning(
+                f"Order {order.id} in unexpected status '{order.status}' "
+                f"after payment success"
+            )
 
         logger.info(f"Payment {payment.id} marked as succeeded")
         return {
@@ -379,7 +417,12 @@ class StripeWebhookService:
 
         payment.status = Payment.Status.CANCELLED
         payment.save(update_fields=['status', 'updated_at'])
-        logger.info(f"Payment {payment.id} cancelled")
+
+        PaymentService._cancel_order_and_restore_stock(
+            payment.order_id, reason='payment cancelled via webhook'
+        )
+
+        logger.info(f"Payment {payment.id} cancelled via webhook")
         return {
             'status': 'processed',
             'message': f"Payment {payment.id} cancelled"
