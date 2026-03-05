@@ -33,7 +33,6 @@ practices for building scalable backend services.
 - [Current Limitations](#-current-limitations)
 - [Future Work](#-future-work)
 - [Contributing](#-contributing)
-- [License](#-license)
 
 ---
 
