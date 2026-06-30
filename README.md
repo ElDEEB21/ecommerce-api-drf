@@ -4,6 +4,7 @@
   <img src="https://img.shields.io/badge/Stripe-Payment-635BFF?style=for-the-badge&logo=stripe&logoColor=white" alt="Stripe Payment" />
   <img src="https://img.shields.io/badge/JWT-Auth-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" alt="JWT Auth" />
   <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Redis-Caching-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis Caching" />
   <img src="https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.14" />
 </p>
 
@@ -58,6 +59,7 @@ making the codebase maintainable, testable, and easy to extend.
 | 📄 **Auto-Generated Docs** | Interactive Swagger UI via `drf-spectacular`                                |
 | 🔍 **Filtering & Search**  | Filter products by category, search by name, order by price/date            |
 | 📑 **Pagination**          | Consistent paginated responses across all list endpoints                    |
+| ⚡ **Redis Caching**       | Cached product/category endpoints with automatic invalidation on writes     |
 
 ---
 
@@ -104,6 +106,15 @@ making the codebase maintainable, testable, and easy to extend.
 - **Order Status Tracking** — Full lifecycle: Pending → Processing → Shipped → Delivered / Cancelled
 - **Unique Constraints** — Prevents duplicate products in the same cart or order
 
+### ⚡ Redis Caching
+
+- **Product & Category Caching** — Read-heavy public endpoints are cached in Redis with automatic TTL expiration
+- **Smart Invalidation** — Cache is automatically cleared on product/category create, update, or delete
+- **Query-Aware Keys** — Different filter/search/page combinations are cached independently
+- **Pattern-Based Deletion** — Uses `django-redis`'s `delete_pattern` for efficient bulk cache invalidation
+
+> 📖 For a detailed explanation of the caching implementation, see **[Caching Guide](./caching_guide.md)**
+
 ### 🛠️ Developer Experience
 
 - **Split Settings** — Separate `base.py`, `dev.py`, and `prod.py` settings for different environments
@@ -129,15 +140,17 @@ making the codebase maintainable, testable, and easy to extend.
 │  │ (API)    │  │ (Business │  │ (Data Access) │  │
 │  │          │  │  Logic)   │  │              │  │
 │  └──────────┘  └───────────┘  └──────────────┘  │
-│       ↑              ↓              ↓            │
+│       ↑  ↕           ↓              ↓            │
 │  ┌──────────┐  ┌───────────┐  ┌──────────────┐  │
 │  │Serializers│  │  Models   │←─│  Database    │  │
 │  └──────────┘  └───────────┘  └──────────────┘  │
-└─────────────────────────────────────────────────┘
-                         ↕
-┌─────────────────────────────────────────────────┐
-│              Stripe Payment Gateway              │
-└─────────────────────────────────────────────────┘
+└──────────┬──────────────────────────────────────┘
+           │              ↕
+┌──────────┴──────┐ ┌─────────────────────────────┐
+│  Redis Cache    │ │   Stripe Payment Gateway    │
+│  (Products &    │ └─────────────────────────────┘
+│   Categories)   │
+└─────────────────┘
 ```
 
 | Layer           | Responsibility                                              | File                 |
@@ -158,6 +171,8 @@ making the codebase maintainable, testable, and easy to extend.
 | **Django 6.0**                 | Web Framework                   |
 | **Django REST Framework 3.16** | REST API Framework              |
 | **PostgreSQL**                 | Relational Database             |
+| **Redis / Memurai**            | Caching Layer                   |
+| **django-redis**               | Redis Cache Backend for Django  |
 | **SimpleJWT**                  | JWT Authentication              |
 | **Stripe**                     | Payment Processing              |
 | **drf-spectacular**            | OpenAPI/Swagger Documentation   |
@@ -229,6 +244,7 @@ ecommerce-api-drf/
 │           └── urls.py
 │
 ├── API_DOCUMENTATION.md        # Comprehensive API docs
+├── caching_guide.md            # Beginner-friendly caching guide
 ├── requirements.txt
 ├── manage.py
 └── README.md
@@ -350,6 +366,7 @@ ecommerce-api-drf/
 
 - Python 3.12+
 - PostgreSQL
+- Redis (or [Memurai](https://www.memurai.com/) on Windows)
 - Stripe Account (for payments)
 
 ### 1. Clone the Repository
@@ -393,6 +410,9 @@ DB_USER=postgres
 DB_PASSWORD=your_password
 DB_HOST=localhost
 DB_PORT=5432
+
+# Redis / Memurai
+REDIS_URL=redis://127.0.0.1:6379/1
 
 # Stripe
 STRIPE_SECRET_KEY=sk_test_...
@@ -442,6 +462,7 @@ python manage.py runserver
 | `STRIPE_PUBLISHABLE_KEY` | Stripe publishable key                                                 | ✅        |
 | `STRIPE_WEBHOOK_SECRET`  | Stripe webhook signing secret                                          | ✅        |
 | `STRIPE_CURRENCY`        | Default currency (default: `usd`)                                      | ❌        |
+| `REDIS_URL`              | Redis connection URL (default: `redis://127.0.0.1:6379/1`)             | ❌        |
 | `ALLOWED_HOSTS`          | Comma-separated allowed hosts (prod only)                              | ✅ (prod) |
 
 ---
@@ -455,7 +476,7 @@ While this project demonstrates solid backend fundamentals, there are some known
 | 1  | **No Automated Tests**        | The project currently lacks unit tests and integration tests. The `tests.py` files exist but are empty.  |
 | 2  | **No Email Verification**     | Users can register with any email without verification. No email confirmation or "forgot password" flow. |
 | 3  | **No Rate Limiting**          | API endpoints are not rate-limited, making them vulnerable to brute-force attacks.                       |
-| 4  | **No Caching Layer**          | No Redis/Memcached caching is implemented, which could be a bottleneck at scale.                         |
+| ~~4~~  | ~~**No Caching Layer**~~          | ~~No Redis/Memcached caching is implemented, which could be a bottleneck at scale.~~ ✅ **Implemented!** See [Caching Guide](./caching_guide.md) |
 | 5  | **No Image Upload**           | Product images are stored as URLs only — no actual file upload handling (e.g., S3, Cloudinary).          |
 | 6  | **No Logging to File**        | Logging is configured at a basic level without structured logging or external log management.            |
 | 7  | **No CI/CD Pipeline**         | No GitHub Actions, Docker, or automated deployment setup.                                                |
@@ -476,7 +497,7 @@ Here's the roadmap for upcoming improvements:
 - [ ] 📧 **Email Verification & Password Reset** — Implement email confirmation on registration and "forgot password"
   flow
 - [ ] 🐳 **Docker & Docker Compose** — Containerize the application with PostgreSQL, Redis, and the Django app
-- [ ] ⚡ **Redis Caching** — Add caching for product listings, categories, and frequently accessed data
+- [x] ⚡ **Redis Caching** — Add caching for product listings, categories, and frequently accessed data
 - [ ] 🚦 **Rate Limiting** — Implement throttling with DRF's built-in throttle classes or `django-ratelimit`
 - [ ] 🔄 **API Versioning** — Introduce `/api/v1/` prefix for all endpoints
 - [ ] 📦 **Product Variants** — Support for sizes, colors, and other product variations
