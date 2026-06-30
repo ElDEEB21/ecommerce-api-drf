@@ -1,5 +1,24 @@
+from django.core.cache import cache
+
 from . import selectors
 from .models import Product
+
+
+def _invalidate_product_caches(product_slug=None):
+    """
+    Clear all product-related caches.
+    Called after any product create/update/delete.
+    """
+    cache.delete_pattern("*product_list*")
+    if product_slug:
+        cache.delete(f"product_detail:{product_slug}")
+
+
+def _invalidate_category_caches(category_slug=None):
+    """Clear all category-related caches."""
+    cache.delete_pattern("*category_list*")
+    if category_slug:
+        cache.delete(f"category_detail:{category_slug}")
 
 
 class ProductService:
@@ -29,6 +48,8 @@ class ProductService:
             is_active=product_data.get('is_active', True),
             category=category
         )
+        _invalidate_product_caches()
+        _invalidate_category_caches(category.slug)
         return product
 
     @staticmethod
@@ -48,6 +69,8 @@ class ProductService:
         except Product.DoesNotExist:
             raise ValueError("Product does not exist")
 
+        old_slug = product.slug
+
         if 'category_id' in product_data:
             category_id = product_data.get('category_id')
             category = selectors.get_category_by_id(category_id)
@@ -63,6 +86,9 @@ class ProductService:
         product.is_active = product_data.get('is_active', product.is_active)
 
         product.save()
+        _invalidate_product_caches(old_slug)
+        if product.slug != old_slug:
+            _invalidate_product_caches(product.slug)
         return product
 
     @staticmethod
@@ -82,7 +108,9 @@ class ProductService:
         except Product.DoesNotExist:
             raise ValueError("Product does not exist")
 
+        slug = product.slug
         product.delete()
+        _invalidate_product_caches(slug)
         return product
 
     def add_image_to_product(product: Product, image_url: str) -> Product:
@@ -95,6 +123,7 @@ class ProductService:
             Updated Product instance with the new image
         """
         product.images.create(image_url=image_url)
+        _invalidate_product_caches(product.slug)
         return product
 
 class InventoryService:
@@ -128,6 +157,7 @@ class InventoryService:
 
         product.stock_quantity -= quantity
         product.save()
+        _invalidate_product_caches(product.slug)
         return product
 
     @staticmethod
@@ -142,4 +172,5 @@ class InventoryService:
         """
         product.stock_quantity += quantity
         product.save()
+        _invalidate_product_caches(product.slug)
         return product

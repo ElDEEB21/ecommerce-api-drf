@@ -1,4 +1,5 @@
-﻿drf-spectacular
+django-redis
+drf-spectacular
 ﻿asgiref==3.11.1
 certifi==2026.1.4
 charset-normalizer==3.4.4
