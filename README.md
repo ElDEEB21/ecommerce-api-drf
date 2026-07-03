@@ -474,7 +474,7 @@ While this project demonstrates solid backend fundamentals, there are some known
 | 1  | **No Automated Tests**        | The project currently lacks unit tests and integration tests. The `tests.py` files exist but are empty.  |
 | 2  | **No Email Verification**     | Users can register with any email without verification. No email confirmation or "forgot password" flow. |
 | 3  | **No Rate Limiting**          | API endpoints are not rate-limited, making them vulnerable to brute-force attacks.                       |
-| ~~4~~  | ~~**No Caching Layer**~~          | ~~No Redis/Memcached caching is implemented, which could be a bottleneck at scale.~~ ✅ **Implemented!** See [Caching Guide](./caching_guide.md) |
+| ~~4~~  | ~~**No Caching Layer**~~          | ~~No Redis/Memcached caching is implemented, which could be a bottleneck at scale.~~ ✅ **Implemented!** See |
 | 5  | **No Image Upload**           | Product images are stored as URLs only — no actual file upload handling (e.g., S3, Cloudinary).          |
 | 6  | **No Logging to File**        | Logging is configured at a basic level without structured logging or external log management.            |
 | 7  | **No CI/CD Pipeline**         | No GitHub Actions, Docker, or automated deployment setup.                                                |
