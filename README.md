@@ -113,8 +113,6 @@ making the codebase maintainable, testable, and easy to extend.
 - **Query-Aware Keys** — Different filter/search/page combinations are cached independently
 - **Pattern-Based Deletion** — Uses `django-redis`'s `delete_pattern` for efficient bulk cache invalidation
 
-> 📖 For a detailed explanation of the caching implementation, see **[Caching Guide](./caching_guide.md)**
-
 ### 🛠️ Developer Experience
 
 - **Split Settings** — Separate `base.py`, `dev.py`, and `prod.py` settings for different environments
